@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>오늘 뭐 먹지?</title>
+<style>
+:root{--bg:#f6f5f1;--ink:#24251f;--muted:#77796f;--accent:#e76f51;--line:#e8e5dc;--card:#fff;--green:#668b72}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:28px 20px 50px}
+.top{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px}
+.logo{font-weight:800;letter-spacing:-.5px;color:var(--ink);font-size:15px}
+.hero{text-align:center;padding:46px 12px 28px}
+.eyebrow{color:var(--accent);font-size:12px;font-weight:800;letter-spacing:2px}
+h1{font-size:clamp(34px,7vw,52px);letter-spacing:-2px;margin:12px 0 10px}
+.sub{color:var(--muted);font-size:15px;line-height:1.6}
+.date{font-size:13px;color:var(--muted);margin-top:16px}
+.main{background:var(--card);border:1px solid var(--line);border-radius:26px;padding:30px 24px;text-align:center;box-shadow:0 12px 35px #28251b0b}
+.result-label{font-size:12px;color:var(--muted);font-weight:700;letter-spacing:1px}
+.result{min-height:100px;display:flex;align-items:center;justify-content:center;font-size:clamp(32px,7vw,46px);font-weight:850;letter-spacing:-1.5px;padding:12px 0}
+.result.empty{font-size:22px;color:#aaa;font-weight:600}
+.result.pop{animation:pop .45s ease}
+@keyframes pop{0%{transform:scale(.8);opacity:.3}70%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
+.actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+button{border:0;border-radius:14px;padding:15px 24px;font-size:15px;font-weight:750;cursor:pointer;transition:.15s}
+button:active{transform:scale(.97)}
+.primary{background:var(--accent);color:white;min-width:170px}
+.secondary{background:#f0eee8;color:var(--ink)}
+button:disabled{opacity:.4;cursor:not-allowed}
+.status{font-size:13px;color:var(--muted);margin-top:18px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px}
+.panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.panel h2{font-size:15px;margin:0;letter-spacing:-.3px}
+.count{font-size:12px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{font-size:13px;padding:7px 10px;border-radius:999px;background:#f4f2ec;color:#57594f}
+.chip.used{background:#f9e9e4;color:#bd6048;text-decoration:line-through}
+.note{font-size:12px;color:var(--muted);line-height:1.65;margin:18px 2px 0}
+.refresh{background:transparent;color:var(--green);padding:7px 0;font-size:12px}
+.footer{text-align:center;color:#99998f;font-size:11px;margin-top:24px}
+@media(max-width:560px){.wrap{padding:20px 14px 36px}.hero{padding:38px 5px 24px}.main{padding:25px 15px}.grid{grid-template-columns:1fr}.panel{padding:17px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><div class="logo">🍽️ 오늘 뭐 먹지?</div><div id="liveState">오늘의 메뉴 준비 중</div></div>
+  <header class="hero">
+    <div class="eyebrow">DAILY MENU PICKER</div>
+    <h1>오늘 뭐 먹을까?</h1>
+    <div class="sub">고민은 짧게, 맛있는 선택은 확실하게.<br>오늘의 인기 검색 흐름에서 메뉴를 골라드려요.</div>
+    <div class="date" id="today"></div>
+  </header>
+  <section class="main">
+    <div class="result-label">TODAY'S PICK</div>
+    <div class="result empty" id="result">버튼을 눌러 메뉴를 뽑아보세요!</div>
+    <div class="actions">
+      <button class="primary" id="draw">🎲 메뉴 뽑기</button>
+      <button class="secondary" id="again" disabled>다시 뽑기 ↻</button>
+    </div>
+    <div class="status" id="status">오늘의 후보 메뉴를 불러오고 있어요.</div>
+  </section>
+  <div class="grid">
+    <section class="panel">
+      <div class="panel-head"><h2>오늘의 추천 후보</h2><span class="count" id="candidateCount">0개</span></div>
+      <div class="chips" id="candidates"></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>이미 뽑은 메뉴</h2><span class="count" id="usedCount">0개</span></div>
+      <div class="chips" id="used"></div>
+    </section>
+  </div>
+  <p class="note" id="sourceNote">검색 트렌드를 확인하는 중입니다.</p>
+  <div class="footer">매일 새로운 메뉴 후보 · 중복 없이 추첨</div>
+</div>
+<script>
+const FALLBACK = ["김치찌개","제육볶음","돈가스","비빔밥","마라탕","초밥","삼겹살","쌀국수","햄버거","파스타","순두부찌개","치킨","떡볶이","칼국수","냉면","국밥","부대찌개","카레","찜닭","샤브샤브","회덮밥","라멘","보쌈","짜장면","짬뽕","닭갈비","오므라이스","우동","김밥","감자탕"];
+const FOOD_MAP = [
+ [/치킨|닭강정/,"치킨"],[/피자/,"피자"],[/햄버거|버거/,"햄버거"],[/초밥|스시|회/,"초밥"],[/마라탕|마라샹궈/,"마라탕"],[/떡볶이/,"떡볶이"],[/김치찌개/,"김치찌개"],[/된장찌개/,"된장찌개"],[/순두부/,"순두부찌개"],[/제육/,"제육볶음"],[/삼겹살/,"삼겹살"],[/돈까스|돈가스/,"돈가스"],[/국밥/,"국밥"],[/냉면/,"냉면"],[/칼국수/,"칼국수"],[/라면/,"라면"],[/파스타/,"파스타"],[/쌀국수/,"쌀국수"],[/짜장면|짜장/,"짜장면"],[/짬뽕/,"짬뽕"],[/족발/,"족발"],[/보쌈/,"보쌈"],[/김밥/,"김밥"],[/샤브샤브/,"샤브샤브"],[/갈비/,"갈비구이"],[/찜닭/,"찜닭"],[/부대찌개/,"부대찌개"],[/카레/,"카레"],[/우동/,"우동"],[/비빔밥/,"비빔밥"]
+];
+const $ = id => document.getElementById(id);
+const todayKey = () => new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+let day = todayKey(), candidates = [...FALLBACK], used = [], current = "";
+$("today").textContent = new Intl.DateTimeFormat("ko-KR",{timeZone:"Asia/Seoul",year:"numeric",month:"long",day:"numeric",weekday:"long"}).format(new Date());
+
+function loadState(){
+  const saved = JSON.parse(localStorage.getItem("menu-picker-state") || "null");
+  if(saved && saved.day === day){used=saved.used||[];current=saved.current||"";}
+  else {used=[];current="";saveState();}
+}
+function saveState(){localStorage.setItem("menu-picker-state",JSON.stringify({day,used,current}));}
+function render(){
+  $("candidateCount").textContent=candidates.length+"개";
+  $("usedCount").textContent=used.length+"개";
+  $("candidates").innerHTML=candidates.map(x=>`<span class="chip ${used.includes(x)?"used":""}">${x}</span>`).join("");
+  $("used").innerHTML=used.length?used.map(x=>`<span class="chip used">${x}</span>`).join(""):'<span class="count">아직 뽑은 메뉴가 없어요.</span>';
+  $("again").disabled=candidates.filter(x=>!used.includes(x)).length===0;
+  $("draw").disabled=$("again").disabled;
+  if(current){$("result").textContent=current;$("result").classList.remove("empty");}
+}
+function draw(){
+  const pool=candidates.filter(x=>!used.includes(x));
+  if(!pool.length){$("status").textContent="오늘 준비된 메뉴를 모두 뽑았어요!";return;}
+  const picked=pool[Math.floor(Math.random()*pool.length)];
+  used.push(picked);current=picked;saveState();render();
+  $("result").classList.remove("pop");void $("result").offsetWidth;$("result").classList.add("pop");
+  $("status").textContent=`오늘 ${used.length}번째 선택! 남은 메뉴 ${candidates.length-used.length}개`;
+}
+$("draw").addEventListener("click",draw);
+$("again").addEventListener("click",draw);
+
+async function fetchTrends(){
+  // Google Trends Trending Now RSS. Public feed is proxied because the feed does not expose browser CORS headers.
+  const url="https://trends.google.com/trending/rss?geo=KR";
+  const proxy="https://proxy.cors.dev/?url="+encodeURIComponent(url);
+  try{
+    const response=await fetch(proxy,{signal:AbortSignal.timeout(9000)});
+    if(!response.ok) throw new Error("trend feed unavailable");
+    const xml=new DOMParser().parseFromString(await response.text(),"text/xml");
+    const titles=[...xml.querySelectorAll("item title")].map(n=>n.textContent.trim());
+    const mapped=[];
+    for(const title of titles){
+      for(const [pattern,menu] of FOOD_MAP){if(pattern.test(title)&&!mapped.includes(menu))mapped.push(menu);}
+    }
+    if(mapped.length>=3){
+      candidates=[...mapped,...FALLBACK.filter(x=>!mapped.includes(x))].slice(0,30);
+      $("liveState").textContent="● 검색 트렌드 반영";
+      $("sourceNote").textContent="Google Trends 한국 급상승 검색어를 확인해 음식 관련 검색어를 메뉴 후보로 변환했습니다. 검색어가 음식과 무관하거나 피드 연결이 제한되면 일반 인기 메뉴로 후보를 보완합니다. 검색량 순위가 아닌 메뉴 추첨용 후보 목록입니다.";
+    } else throw new Error("not enough food trends");
+  }catch(e){
+    candidates=[...FALLBACK];
+    $("liveState").textContent="기본 메뉴 목록";
+    $("sourceNote").textContent="현재 실시간 검색 트렌드를 불러오지 못해 기본 인기 메뉴 목록으로 운영 중입니다. 실제 운영용으로 안정적인 자동 갱신을 원하면 서버에서 검색 트렌드 API를 연결하는 방식이 권장됩니다.";
+  }
+  // Keep the existing day's history; remove history items not in today's candidate list.
+  used=used.filter(x=>candidates.includes(x));
+  if(current&&!candidates.includes(current))current="";
+  saveState();render();
+  $("status").textContent=`후보 ${candidates.length}개 중 ${used.length}개 추첨 완료 · 중복 없이 뽑아요.`;
+}
+loadState();render();fetchTrends();
+setInterval(()=>{if(todayKey()!==day){day=todayKey();used=[];current="";candidates=[...FALLBACK];$("today").textContent=new Intl.DateTimeFormat("ko-KR",{timeZone:"Asia/Seoul",year:"numeric",month:"long",day:"numeric",weekday:"long"}).format(new Date());saveState();render();fetchTrends();}},60000);
+</script>
+</body>
+</html>
